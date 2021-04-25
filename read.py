@@ -1,6 +1,8 @@
+import time as currenttime
+start_time = currenttime.time()
 import Nio
 import Ngl
-import numpy,sys,os
+import numpy,sys,os, math
 
 cdf_file = Nio.open_file("data/test.nc","r")
 #print(cdf_file.dimensions)
@@ -22,33 +24,34 @@ Y = cdf_file.variables["Y"]
 
 #############Code refactoring
 
-def plotter(targetVariable, outputType, outputName, time, layer, plotTitle):
+def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, palette):
     #pyNgl setup
-    wks = Ngl.open_wks(outputType,outputName)
+    wkres = Ngl.Resources()
+    wkres.wkWidth = wkres.wkHeight = 5000
+    wks = Ngl.open_wks(outputType, f"./outputs/{outputName}",wkres)
     resources = Ngl.Resources()
     #Plot settings
-    resources.mpFillOn              = True         # Turn on map fill.
-    resources.mpFillAreaSpecifiers  = ["Water","Land","AllNational"]
-    resources.mpSpecifiedFillColors = [17,18,17]
-    resources.mpAreaMaskingOn       = True            # Indicate we want to
-    resources.mpMaskAreaSpecifiers  = "Africa"  # mask land.
-    resources.mpPerimOn             = True            # Turn on a perimeter.
-    #resources.mpGridMaskMode        = "MaskLand"      # Mask grid over land.
-    resources.cnFillDrawOrder       = "PreDraw"       # Draw contours first.
 
-    ic = Ngl.new_color(wks,0.75,0.75,0.75) #set colormap
+    maxVariable = int(math.ceil(numpy.amax(targetVariable[:,layer,:,:]) / 100.0)) * 100
+    if palette:
+        resources.cnFillPalette = palette 
     resources.cnFillOn = True
     resources.cnLinesOn = False
     resources.cnLineLabelsOn = False # Hide in-plot labels
+    resources.cnLevelSelectionMode = "ManualLevels"
     resources.cnRasterModeOn = True
+    resources.cnMinLevelValF = 100
+    resources.cnMaxLevelValF = maxVariable
+    resources.cnLevelSpacingF = int(maxVariable/8)
     resources.tiMainString = plotTitle
     #Projection settings
     resources.mpProjection = "LambertConformal"
-    resources.mpLambertParallel1F = 45
-    resources.mpLambertParallel2F = 22
-    resources.mpLambertMeridianF = 20
-    resources.mpDataBaseVersion    = "HighRes"
-    #View window boundaries
+    resources.mpLambertParallel1F = cdf_file.attributes['P_ALP'] #45
+    resources.mpLambertParallel2F = cdf_file.attributes['P_BET'] #22
+    resources.mpLambertMeridianF = cdf_file.attributes['P_GAM'] #20
+    #resources.mpDataBaseVersion    = "HighRes"
+    resources.mpDataBaseVersion = "MediumRes"
+    #Set view window boundaries
     resources.mpLimitMode = "Corners"
     resources.mpLeftCornerLatF = lat[0,0]
     resources.mpLeftCornerLonF = lon[0,0]
@@ -60,6 +63,17 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle):
     resources.tmYROn = False
     resources.tmYLOn = False
     Ngl.contour_map(wks,targetVariable[time,layer,:,:],resources)
+    Ngl.destroy(wks)
 
-plotter(ccrs, 'x11', 'def test', 0, 0, 'title')
+layer = 10
+time = 0
+palette = 'test'
+
+while time < 1:
+    name = f"time {time}"
+    plotTitle = f"Layer: {layer} / Time: {time}h"
+    plotter(ccrs, 'png', name, time, layer, plotTitle,palette)
+    time +=1
+
 cdf_file.close()
+print(f"--- {float(currenttime.time() - start_time):.4f} seconds ---")
