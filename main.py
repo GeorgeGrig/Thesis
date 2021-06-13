@@ -4,11 +4,11 @@ import Nio
 import Ngl
 import numpy,sys,os, math, glob, re
 from PIL import Image
-
+import imageio
 
 def animator(path, layer):
     # Create the frames
-    frames = []
+    images = []
     imgs = glob.glob(f"{path}/*.png")
     imgs.sort(key=os.path.getmtime)
     for i in imgs:
@@ -16,12 +16,9 @@ def animator(path, layer):
         check = check.split(' -')[0]
         if check == str(layer):
             new_frame = Image.open(i)
-            frames.append(new_frame)
+            images.append(new_frame)
     # Save into a GIF file that loops forever
-    frames[0].save(f"{path}/{layer} animation.gif", format='GIF',
-                append_images=frames[1:],
-                save_all=True,
-                duration=300, loop=0)
+    imageio.mimsave(f"{path}/{layer} animation.gif", images, duration=0.5)
 
 def cropper(name):
     im = Image.open(name)
@@ -97,9 +94,9 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, pale
 file_names = ['20200514grd01.nc','20200515grd01.nc','20200516grd01.nc']
 layers = [[0,1,4,5],0,'SUM']
 starting_time = 0
-max_time = 15
+max_time = 23
 palette = 'test'
-levels = [10,20,40,80,160,320,640,1280]
+levels = [20,40,80,160,320,640,1280,2560]
 animate = True
 # SCRIPT SETTINGS ###########################################
 
