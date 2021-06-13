@@ -10,6 +10,7 @@ def animator(path, layer):
     # Create the frames
     frames = []
     imgs = glob.glob(f"{path}/*.png")
+    imgs.sort(key=os.path.getmtime)
     for i in imgs:
         check = i.split(' - layer ')[1]
         check = check.split(' -')[0]
@@ -96,7 +97,7 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, pale
 file_names = ['20200514grd01.nc','20200515grd01.nc','20200516grd01.nc']
 layers = [[0,1,4,5],0,'SUM']
 starting_time = 0
-max_time = 23
+max_time = 15
 palette = 'test'
 levels = [10,20,40,80,160,320,640,1280]
 animate = True
@@ -130,7 +131,7 @@ for file_name in file_names:
             path = f"./outputs/{file_name[6]}{file_name[7]}/{key}"
             while time < max_time:
                 print(f'Now doing time {time}h - layer {layer} - particle {key} and filename {file_name}')
-                name = f"time {time}h - layer {layer} - particle {key} - day {file_name[6]}{file_name[7]}"
+                name = f"{time}h - layer {layer} - particle {key} - day {file_name[6]}{file_name[7]}"
                 plotTitle = f"Layer: {layer} / Time: {time}h / {key}"
                 
                 plotter(particles[key], 'png', name, time, layer, plotTitle,palette, levels, path)
