@@ -4,31 +4,16 @@ import Nio
 import Ngl
 import numpy,sys,os, math
 
-cdf_file = Nio.open_file("data/test.nc","r")
-#print(cdf_file.dimensions)
-#print(cdf_file.attributes.keys())
-#print(cdf_file.rank)
-#print(cdf_file.variables)
-#print(cdf_file)
-#print(Ngl.pynglpath('rangs'))
-
-#Assign variables
-lat  = cdf_file.variables["latitude"]  # Latitude
-lon  = cdf_file.variables["longitude"]  # Longitude
-Z    = cdf_file.variables["z"]    # Geopotential height
-fcrs = cdf_file.variables["FCRS"] # Fine dust particles
-ccrs = cdf_file.variables["CCRS"] # Coarse dust particles
-time = cdf_file.variables["time"]
-X = cdf_file.variables["X"]
-Y = cdf_file.variables["Y"]
 
 #############Code refactoring
 
-def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, palette):
+def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, palette, levels, file_name, key):
     #pyNgl setup
     wkres = Ngl.Resources()
-    wkres.wkWidth = wkres.wkHeight = 5000
-    wks = Ngl.open_wks(outputType, f"./outputs/{outputName}",wkres)
+    wkres.wkWidth = wkres.wkHeight = 1000
+    path = f"./outputs/{file_name[6]}{file_name[7]}/{key}"
+    os.makedirs(path, exist_ok=True) 
+    wks = Ngl.open_wks(outputType, f'{path}/{outputName}',wkres)
     resources = Ngl.Resources()
     #Plot settings
 
@@ -38,11 +23,13 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, pale
     resources.cnFillOn = True
     resources.cnLinesOn = False
     resources.cnLineLabelsOn = False # Hide in-plot labels
-    resources.cnLevelSelectionMode = "ManualLevels"
+    resources.cnLevelSelectionMode = "ExplicitLevels"
+    resources.cnLevels = levels
+    resources.cnGridBoundFillColor = "black"
     resources.cnRasterModeOn = True
-    resources.cnMinLevelValF = 100
-    resources.cnMaxLevelValF = maxVariable
-    resources.cnLevelSpacingF = int(maxVariable/8)
+    #resources.cnMinLevelValF = 100
+    #resources.cnMaxLevelValF = maxVariable
+    #resources.cnLevelSpacingF = int(maxVariable/7)
     resources.tiMainString = plotTitle
     #Projection settings
     resources.mpProjection = "LambertConformal"
@@ -65,15 +52,46 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, pale
     Ngl.contour_map(wks,targetVariable[time,layer,:,:],resources)
     Ngl.destroy(wks)
 
-layer = 10
-time = 0
+# SCRIPT SETTINGS #
+file_names = ['20200514grd01.nc','20200515grd01.nc','20200516grd01.nc']
+layers = [0,10,17]
+starting_time = 0
+max_time = 10
 palette = 'test'
+levels = [10,20,40,80,160,320,640,1280]
+# SCRIPT SETTINGS #
 
-while time < 1:
-    name = f"time {time}"
-    plotTitle = f"Layer: {layer} / Time: {time}h"
-    plotter(ccrs, 'png', name, time, layer, plotTitle,palette)
-    time +=1
+for file_name in file_names:
+    cdf_file = Nio.open_file(f"data/{file_name}","r")
+    #print(cdf_file.dimensions)
+    #print(cdf_file.attributes.keys())
+    #print(cdf_file.rank)
+    #print(cdf_file.variables)
+    #print(cdf_file)
+    #print(Ngl.pynglpath('rangs'))
 
-cdf_file.close()
-print(f"--- {float(currenttime.time() - start_time):.4f} seconds ---")
+    #Assign variables
+    lat  = cdf_file.variables["latitude"]  # Latitude
+    lon  = cdf_file.variables["longitude"]  # Longitude
+    Z    = cdf_file.variables["z"]    # Geopotential height
+    fcrs = cdf_file.variables["FCRS"] # Fine dust particles
+    ccrs = cdf_file.variables["CCRS"] # Coarse dust particles
+    #time = cdf_file.variables["time"]
+    X = cdf_file.variables["X"]
+    Y = cdf_file.variables["Y"]
+    particles = {   'fcrs':fcrs,
+                    'ccrs':ccrs}
+    keys = particles.keys()
+    for key in keys:
+        for layer in layers:
+            time = starting_time
+            while time < max_time:
+                print(f'Now doing time {time}h - layer {layer} - particle {key} and filename {file_name}')
+                name = f"time {time}h - layer {layer} - particle {key} - day {file_name[6]}{file_name[7]}"
+                plotTitle = f"Layer: {layer} / Time: {time}h / {key}"
+                
+                plotter(particles[key], 'png', name, time, layer, plotTitle,palette, levels, file_name, key)
+                time +=1
+
+    cdf_file.close()
+    print(f"--- {float(currenttime.time() - start_time):.4f} seconds ---")
