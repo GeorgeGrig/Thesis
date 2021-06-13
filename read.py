@@ -7,7 +7,7 @@ import numpy,sys,os, math
 
 #############Code refactoring
 
-def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, palette, levels, file_name, key):
+def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, palette, levels, file_name, key, z_dim):
     #pyNgl setup
     wkres = Ngl.Resources()
     wkres.wkWidth = wkres.wkHeight = 1000
@@ -17,7 +17,7 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, pale
     resources = Ngl.Resources()
     #Plot settings
 
-    maxVariable = int(math.ceil(numpy.amax(targetVariable[:,layer,:,:]) / 100.0)) * 100
+    #maxVariable = int(math.ceil(numpy.amax(targetVariable[:,layer,:,:]) / 100.0)) * 100
     if palette:
         resources.cnFillPalette = palette 
     resources.cnFillOn = True
@@ -49,17 +49,31 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, pale
     resources.tmXBOn = False
     resources.tmYROn = False
     resources.tmYLOn = False
-    Ngl.contour_map(wks,targetVariable[time,layer,:,:],resources)
+    if layer == 'SUM':
+        i = 1
+        targetVariable_ = targetVariable[time,0,:,:]
+        while i < z_dim:
+            targetVariable_ += targetVariable[time,i,:,:]
+            i += 1
+    elif type(layer) is int:
+        targetVariable_ = targetVariable[time,layer,:,:]
+    else:
+        i = 1
+        targetVariable_ = targetVariable[time,layer[0],:,:]
+        while i < len(layer):
+            targetVariable_ += targetVariable[time,layer[i],:,:]
+            i += 1
+    Ngl.contour_map(wks,targetVariable_,resources)
     Ngl.destroy(wks)
 
-# SCRIPT SETTINGS #
+# SCRIPT SETTINGS ###########################################
 file_names = ['20200514grd01.nc','20200515grd01.nc','20200516grd01.nc']
-layers = [0,10,17]
+layers = [[0,1,4,5],0,'SUM']
 starting_time = 0
 max_time = 10
 palette = 'test'
 levels = [10,20,40,80,160,320,640,1280]
-# SCRIPT SETTINGS #
+# SCRIPT SETTINGS ###########################################
 
 for file_name in file_names:
     cdf_file = Nio.open_file(f"data/{file_name}","r")
@@ -73,7 +87,8 @@ for file_name in file_names:
     #Assign variables
     lat  = cdf_file.variables["latitude"]  # Latitude
     lon  = cdf_file.variables["longitude"]  # Longitude
-    Z    = cdf_file.variables["z"]    # Geopotential height
+    # Z    = cdf_file.variables["z"]    # Geopotential height
+    z_dim = cdf_file.dimensions['LAY']
     fcrs = cdf_file.variables["FCRS"] # Fine dust particles
     ccrs = cdf_file.variables["CCRS"] # Coarse dust particles
     #time = cdf_file.variables["time"]
@@ -90,7 +105,7 @@ for file_name in file_names:
                 name = f"time {time}h - layer {layer} - particle {key} - day {file_name[6]}{file_name[7]}"
                 plotTitle = f"Layer: {layer} / Time: {time}h / {key}"
                 
-                plotter(particles[key], 'png', name, time, layer, plotTitle,palette, levels, file_name, key)
+                plotter(particles[key], 'png', name, time, layer, plotTitle,palette, levels, file_name, key, z_dim)
                 time +=1
 
     cdf_file.close()
