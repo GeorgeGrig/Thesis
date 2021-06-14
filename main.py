@@ -40,19 +40,14 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, pale
     resources = Ngl.Resources()
     #Plot settings
 
-    #maxVariable = int(math.ceil(numpy.amax(targetVariable[:,layer,:,:]) / 100.0)) * 100
     if palette:
         resources.cnFillPalette = palette 
     resources.cnFillOn = True
     resources.cnLinesOn = False
     resources.cnLineLabelsOn = False # Hide in-plot labels
     resources.cnLevelSelectionMode = "ExplicitLevels"
-    resources.cnLevels = levels
     resources.cnGridBoundFillColor = "black"
     resources.cnRasterModeOn = True
-    #resources.cnMinLevelValF = 100
-    #resources.cnMaxLevelValF = maxVariable
-    #resources.cnLevelSpacingF = int(maxVariable/7)
     resources.tiMainString = plotTitle
     #Projection settings
     resources.mpProjection = "LambertConformal"
@@ -72,16 +67,32 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, pale
     resources.tmXBOn = False
     resources.tmYROn = False
     resources.tmYLOn = False
+    if isinstance(targetVariable, list):
+        i = 0
+        targetVariable_ = targetVariable[0][:,:,:,:]
+        while i < len(targetVariable):
+            targetVariable_ += targetVariable[i][:,:,:,:]
+            i += 1
+        targetVariable = targetVariable_
+        
     if layer == 'SUM':
         i = 1
+        maxVariable = 0
         targetVariable_ = targetVariable[time,0,:,:]
         while i < z_dim:
             targetVariable_ += targetVariable[time,i,:,:]
+            _maxVariable = int(math.ceil(numpy.amax(targetVariable[:,i,:,:]) / 100.0)) * 100
+            if _maxVariable > maxVariable:
+                maxVariable = _maxVariable
             i += 1
+        levels = list(range(100,int(maxVariable+100),int(maxVariable/7)))#maybe comment this out
+        resources.cnLevels = levels
     elif type(layer) is int:
         targetVariable_ = targetVariable[time,layer,:,:]
+        resources.cnLevels = levels
     else:
         i = 1
+        resources.cnLevels = levels
         targetVariable_ = targetVariable[time,layer[0],:,:]
         while i < len(layer):
             targetVariable_ += targetVariable[time,layer[i],:,:]
@@ -92,7 +103,7 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, pale
 
 # SCRIPT SETTINGS ###########################################
 file_names = ['20200514grd01.nc','20200515grd01.nc','20200516grd01.nc']
-layers = [[0,1,4,5],0,'SUM']
+layers = [0,'SUM',[0,1,4,5]]
 starting_time = 0
 max_time = 23
 palette = 'test'
@@ -117,10 +128,12 @@ for file_name in file_names:
     fcrs = cdf_file.variables["FCRS"] # Fine dust particles
     ccrs = cdf_file.variables["CCRS"] # Coarse dust particles
     #time = cdf_file.variables["time"]
-    X = cdf_file.variables["X"]
+    X = cdf_file.variables["X"] 
     Y = cdf_file.variables["Y"]
-    particles = {   'fcrs':fcrs,
-                    'ccrs':ccrs}
+    particles = {   'comb':[fcrs,ccrs],
+                    'fcrs':fcrs,
+                    'ccrs':ccrs
+                    }
     keys = particles.keys()
     for key in keys:
         for layer in layers:
