@@ -9,9 +9,12 @@ import imageio
 def animator(path, layer):
     # Create the frames
     images = []
+    #Get all images in specified order
     imgs = glob.glob(f"{path}/*.png")
+    #Sort by date created
     imgs.sort(key=os.path.getmtime)
     for i in imgs:
+        #Check if image matches specified layer
         check = i.split(' - layer ')[1]
         check = check.split(' -')[0]
         if check == str(layer):
@@ -30,18 +33,17 @@ def cropper(name):
     im1 = im.crop((left, top, right, bottom))
     im1.save(name)
 
-def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, palette, levels, path):
+def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, palette, alt_palette, levels, path):
     #pyNgl setup
     wkres = Ngl.Resources()
     wkres.wkWidth = wkres.wkHeight = 1000
+    #Make required folders if the don't exist
     os.makedirs(path, exist_ok=True) 
     full_path = f'{path}/{outputName}'
     wks = Ngl.open_wks(outputType,full_path ,wkres)
     resources = Ngl.Resources()
-    #Plot settings
-
-    if palette:
-        resources.cnFillPalette = palette 
+    #Global pyngl settings
+    resources.cnFillPalette = palette 
     resources.cnFillOn = True
     resources.cnLinesOn = False
     resources.cnLineLabelsOn = False # Hide in-plot labels
@@ -67,6 +69,7 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, pale
     resources.tmXBOn = False
     resources.tmYROn = False
     resources.tmYLOn = False
+    # If combination plot is required
     if isinstance(targetVariable, list):
         i = 0
         targetVariable_ = targetVariable[0][:,:,:,:]
@@ -74,43 +77,47 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, pale
             targetVariable_ += targetVariable[i][:,:,:,:]
             i += 1
         targetVariable = targetVariable_
-        
+    # If layer sum plot is required make neccesary changes (change palette, add layer concetrations, specify new levels)
     if layer == 'SUM':
         i = 1
         maxVariable = 0
+        resources.cnFillPalette = alt_palette
         targetVariable_ = targetVariable[time,0,:,:]
         while i < z_dim:
             targetVariable_ += targetVariable[time,i,:,:]
+            #Find max variable for max layer
             _maxVariable = int(math.ceil(numpy.amax(targetVariable[:,i,:,:]) / 100.0)) * 100
             if _maxVariable > maxVariable:
                 maxVariable = _maxVariable
             i += 1
-        levels = list(range(100,int(maxVariable+100),int(maxVariable/7)))#maybe comment this out
-        resources.cnLevels = levels
+        levels = list(range(100,int(maxVariable+100),int(maxVariable/((len(levels)-1)*100))*100))#maybe comment this out if layers appear off
+    # If layer is a simple integer
     elif type(layer) is int:
         targetVariable_ = targetVariable[time,layer,:,:]
-        resources.cnLevels = levels
+    # If layer is a list of integers combine said layers
     else:
         i = 1
-        resources.cnLevels = levels
         targetVariable_ = targetVariable[time,layer[0],:,:]
         while i < len(layer):
             targetVariable_ += targetVariable[time,layer[i],:,:]
             i += 1
+    resources.cnLevels = levels
     Ngl.contour_map(wks,targetVariable_,resources)
     cropper(f'{full_path}.{outputType}')
     Ngl.destroy(wks)
 
 # SCRIPT SETTINGS ###########################################
 file_names = ['20200514grd01.nc','20200515grd01.nc','20200516grd01.nc']
-layers = [0,'SUM',[0,1,4,5]]
+layers = ['SUM',[0,1,4,5],0] # Use integer/'SUM'/list_of_integers
 starting_time = 0
 max_time = 23
 palette = 'test'
+alt_palette = 'precip4_11lev'
 levels = [20,40,80,160,320,640,1280,2560]
 animate = True
 # SCRIPT SETTINGS ###########################################
 
+# For each file (day) repeat
 for file_name in file_names:
     cdf_file = Nio.open_file(f"data/{file_name}","r")
     #print(cdf_file.dimensions)
@@ -135,6 +142,7 @@ for file_name in file_names:
                     'ccrs':ccrs
                     }
     keys = particles.keys()
+    # Recursively make plots for choosen variables/layers/time
     for key in keys:
         for layer in layers:
             time = starting_time
@@ -143,8 +151,7 @@ for file_name in file_names:
                 print(f'Now doing time {time}h - layer {layer} - particle {key} and filename {file_name}')
                 name = f"{time}h - layer {layer} - particle {key} - day {file_name[6]}{file_name[7]}"
                 plotTitle = f"Layer: {layer} / Time: {time}h / {key}"
-                
-                plotter(particles[key], 'png', name, time, layer, plotTitle,palette, levels, path)
+                plotter(particles[key], 'png', name, time, layer, plotTitle,palette,alt_palette, levels, path)
                 time +=1
             if animate:
                 animator(path,layer)
