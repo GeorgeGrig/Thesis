@@ -7,23 +7,32 @@ from PIL import Image
 import imageio
 maxVariable = 0
 step = 0
-def animator(path, layer):
-    # Create the frames
-    images = []
+
+def sorter(path, layer):
     #Get all images in specified order
     imgs = glob.glob(f"{path}/*.png")
     #Sort by date created
     imgs.sort(key=os.path.getmtime)
+    images = []
+    for image in imgs:
+        if 'layer' in image:
+            check = image.split(' - layer ')[1]
+            check = check.split(' -')[0]
+            if check == str(layer):
+                images.append(image)
+    return images
+
+def animator(path, layer):
+    # Create the frames
+    images = []
+    imgs = sorter(path, layer)
     for i in imgs:
-        #Check if image matches specified layer
-        check = i.split(' - layer ')[1]
-        check = check.split(' -')[0]
-        if check == str(layer):
-            new_frame = Image.open(i)
-            images.append(new_frame)
+        new_frame = Image.open(i)
+        images.append(new_frame)
     # Save into a GIF file that loops forever
     print(f"Generating GIF for layer: {layer}")
-    imageio.mimsave(f"{path}/{layer} animation.gif", images, duration=0.2)
+    os.makedirs(f"{path}/{layer}", exist_ok=True)
+    imageio.mimsave(f"{path}/{layer}/{layer} animation.gif", images, duration=0.2)
 
 def cropper(name):
     im = Image.open(name)
@@ -34,6 +43,25 @@ def cropper(name):
     bottom = top + 547
     im1 = im.crop((left, top, right, bottom))
     im1.save(name)
+
+def collager(path, layer, total):
+    imgs = sorter(path, layer)
+    k = 0
+    t = -1
+    m = 0
+    while m < len(imgs)/total:
+        collage = Image.new("RGBA", (1998,1650), color=(255,255,255,255))
+        for i in range(0,1998,999):
+            for j in range(0,1650,550):
+                image = Image.open(imgs[k]).convert("RGBA")
+                collage.paste(image, (i,j))
+                if k == total+t:
+                    os.makedirs(f"{path}/{layer}", exist_ok=True)
+                    collage.save(f"{path}/{layer}/{layer} part {m+1} collage.png")
+                    t = k
+                    print(f"Saved collage at {path}/{layer} part {m+1} collage.png")
+                k += 1
+        m += 1
 
 def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, palette, alt_palette, levels, path, resolution, Z):
     global maxVariable, step
@@ -130,23 +158,25 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, pale
         levels = list(range(10000,int(maxVariable),int(maxVariable/(7*100))*100))#maybe comment this out if layers appear off 
     resources.cnLevels = levels
     Ngl.contour_map(wks,targetVariable_,resources)
-    #cropper(f'{full_path}.{outputType}')
+    cropper(f'{full_path}.{outputType}')
     Ngl.destroy(wks)
 
 # SCRIPT SETTINGS ###########################################
 file_names = ['20200514grd01.nc','20200515grd01.nc','20200516grd01.nc']#]#'20200515grd03.nc',
-layers = ['SUM',[0,1,4,5],0] # Use integer/'SUM'/list_of_integers
+layers = ['SUM',[0,1,2,3,4,5,6,7,8,9,10,11,12,13],[14,15,16,17],0] # Use integer/'SUM'/list_of_integers
 starting_time = 0
 max_time = 23
 palette = 'test'
 alt_palette = 'precip4_11lev'
 levels = [20,40,80,160,320,640,1280,2560]
 animate = True
-resolution = "MediumRes" # "MediumRes" Don't use HighRes for Domain 1, no difference, more compute time
+collage = True
+resolution = "MediumRes" # "MediumRes" Don't use HighRes for Domain 1, no difference, more compute time and weird artifacts
 # SCRIPT SETTINGS ###########################################
 
 # For each file (day) repeat
 for file_name in file_names:
+    maxVariable = step = 0
     print(f"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Now doing file: {file_name}")
     cdf_file = Nio.open_file(f"data/{file_name}","r")
     #print(cdf_file.dimensions)
@@ -171,7 +201,6 @@ for file_name in file_names:
                     'comb':[fcrs,ccrs],
                     }
     keys = particles.keys()
-    #print(Z[:,3,:,:])
     # Recursively make plots for choosen variables/layers/time
     for key in keys:
         print(f"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Now doing variable: {key}")
@@ -186,6 +215,8 @@ for file_name in file_names:
                 time +=1
             if animate:
                 animator(path,layer)
+            if collage:
+                collager(path, layer, 6)
     cdf_file.close()
 
-print(f"--- Total run time : {float((currenttime.time() - start_time)/60):.4f} minutes ---")
+print(f"--- Total run time : {float((currenttime.time() - start_time)/60):.2f} minutes ---")
