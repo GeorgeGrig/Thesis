@@ -8,6 +8,7 @@ import imageio
 maxVariable = 0
 step = 0
 
+#Grabs all available image files, sorts them and picks only the specified
 def sorter(path, layer):
     #Get all images in specified order
     imgs = glob.glob(f"{path}/*.png")
@@ -15,13 +16,14 @@ def sorter(path, layer):
     imgs.sort(key=os.path.getmtime)
     images = []
     for image in imgs:
-        if 'layer' in image:
-            check = image.split(' - layer ')[1]
-            check = check.split(' -')[0]
+        if '~ layer' in image:
+            check = image.split(' ~ layer ')[1]
+            check = check.split(' ~')[0]
             if check == str(layer):
                 images.append(image)
     return images
 
+#Creates gif animation
 def animator(path, layer):
     # Create the frames
     images = []
@@ -34,6 +36,7 @@ def animator(path, layer):
     os.makedirs(f"{path}/{layer}", exist_ok=True)
     imageio.mimsave(f"{path}/{layer}/{layer} animation.gif", images, duration=0.2)
 
+#Crops the image
 def cropper(name):
     im = Image.open(name)
     # Setting the points for cropped image
@@ -44,22 +47,27 @@ def cropper(name):
     im1 = im.crop((left, top, right, bottom))
     im1.save(name)
 
+#Creates collages for the images
 def collager(path, layer, total):
     imgs = sorter(path, layer)
     k = 0
     t = -1
     m = 0
+    #Split available hours in parts
     while m < len(imgs)/total:
+        #Create new collage image
         collage = Image.new("RGBA", (1998,1650), color=(255,255,255,255))
         for i in range(0,1998,999):
             for j in range(0,1650,550):
+                #Paste each image to the correct location of the grid
                 image = Image.open(imgs[k]).convert("RGBA")
                 collage.paste(image, (i,j))
+                #Check if grid is filled
                 if k == total+t:
                     os.makedirs(f"{path}/{layer}", exist_ok=True)
                     collage.save(f"{path}/{layer}/{layer} part {m+1} collage.png")
                     t = k
-                    print(f"Saved collage at {path}/{layer} part {m+1} collage.png")
+                    print(f"Saved collage part {m+1}")
                 k += 1
         m += 1
 
@@ -208,15 +216,18 @@ for file_name in file_names:
             time = starting_time
             path = f"./outputs/{file_name[6]}{file_name[7]}/{key}"
             while time <= max_time:
-                print(f'Now doing time {time}h - layer {layer} - particle {key} and filename {file_name}')
-                name = f"{time}h - layer {layer} - particle {key} - day {file_name[6]}{file_name[7]}"
-                plotTitle = f"Layer: {layer} / Time: {time}h / {key}"
+                layer_name = layer
+                if not isinstance(layer, int):
+                    if len(layer) > 6: layer_name = f'[{layer[0]} - {layer[-1]}]' #Make title names sorter to avoid weird artifacts
+                print(f'Now doing time {time}h - layer {layer_name} - particle {key} and filename {file_name}')
+                name = f"{time}h ~ layer {layer_name} ~ particle {key} ~ day {file_name[6]}{file_name[7]}"
+                plotTitle = f"Layer: {layer_name} / Time: {time}h / {key}"
                 plotter(particles[key], 'png', name, time, layer, plotTitle,palette,alt_palette, levels, path, resolution, Z)
                 time +=1
             if animate:
-                animator(path,layer)
+                animator(path,layer_name)
             if collage:
-                collager(path, layer, 6)
+                collager(path, layer_name, 6)
     cdf_file.close()
 
 print(f"--- Total run time : {float((currenttime.time() - start_time)/60):.2f} minutes ---")
