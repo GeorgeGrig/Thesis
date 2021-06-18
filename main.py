@@ -5,7 +5,8 @@ import Ngl
 import numpy,sys,os, math, glob, re
 from PIL import Image
 import imageio
-
+maxVariable = 0
+step = 0
 def animator(path, layer):
     # Create the frames
     images = []
@@ -34,7 +35,8 @@ def cropper(name):
     im1 = im.crop((left, top, right, bottom))
     im1.save(name)
 
-def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, palette, alt_palette, levels, path, resolution):
+def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, palette, alt_palette, levels, path, resolution, Z):
+    global maxVariable, step
     #pyNgl setup
     wkres = Ngl.Resources()
     wkres.wkWidth = wkres.wkHeight = 1000
@@ -83,20 +85,30 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, pale
             i += 1
         targetVariable = targetVariable_
     # If layer sum plot is required make neccesary changes (change palette, add layer concetrations, specify new levels)
+    
     if layer == 'SUM':
         print(f"Generating sum of all available layers...")
-        i = 1
-        maxVariable = 0
+        i = 1 
         resources.cnFillPalette = alt_palette
-        targetVariable_ = targetVariable[time,0,:,:]
+        #print(len(targetVariable[:,0,:,:]))
+        targetVariable_ = targetVariable[time,0,:,:]*Z[time,0,:,:]
+        #print(len(targetVariable_))
         while i < z_dim:
-            targetVariable_ += targetVariable[time,i,:,:]
+            targetVariable_ += targetVariable[time,i,:,:]*(Z[time,i,:,:] - Z[time,i-1,:,:])
+            #print(Z[time,i,0,0] - Z[time,i-1,0,0])
             #Find max variable for max layer
-            _maxVariable = int(math.ceil(numpy.amax(targetVariable[:,i,:,:]) / 100.0)) * 100
-            if _maxVariable > maxVariable:
+            _maxVariable = int(math.ceil(numpy.amax(targetVariable_[:,:]) / 100.0)) * 100
+            if _maxVariable > maxVariable and time == 0:
                 maxVariable = _maxVariable
+                step = int(maxVariable/(7*100))*100
+                #print(maxVariable)
+            # resources.cnLevelSelectionMode = "ManualLevels"
+            # resources.cnLevelSpacingF = step
+            # resources.cnMinLevelValF = 10000
+            # resources.cnMaxLevelValF = maxVariable
             i += 1
-        #levels = list(range(100,int(maxVariable+maxVariable/5),int(maxVariable/((len(levels)-1)*100))*100))#maybe comment this out if layers appear off
+            levels = list(range(10000,int(maxVariable),step))#maybe comment this out if layers appear off 
+            #print(levels)
     # If layer is a simple integer
     elif type(layer) is int:
         targetVariable_ = targetVariable[time,layer,:,:]
@@ -104,17 +116,25 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, pale
     else:
         print(f"Generating sum of selected layers...")
         i = 1
-        targetVariable_ = targetVariable[time,layer[0],:,:]
+        targetVariable_ = targetVariable[time,layer[0],:,:]*Z[time,layer[0],:,:]
         while i < len(layer):
-            targetVariable_ += targetVariable[time,layer[i],:,:]
+            targetVariable_ += targetVariable[time,layer[i],:,:]*(Z[time,layer[i],:,:] - Z[time,layer[i-1],:,:])
             i += 1
+            _maxVariable = int(math.ceil(numpy.amax(targetVariable_[:,:]) / 100.0)) * 100
+            if time == 0:
+                maxVariable = 0
+            if _maxVariable > maxVariable and time == 0:
+                maxVariable = _maxVariable
+        # resources.cnLevelSelectionMode = "ManualLevels"
+        # resource.cnLevelSpacingF = 7
+        levels = list(range(10000,int(maxVariable),int(maxVariable/(7*100))*100))#maybe comment this out if layers appear off 
     resources.cnLevels = levels
     Ngl.contour_map(wks,targetVariable_,resources)
     #cropper(f'{full_path}.{outputType}')
     Ngl.destroy(wks)
 
 # SCRIPT SETTINGS ###########################################
-file_names = ['20200515grd03.nc']#,'20200514grd01.nc','20200515grd01.nc','20200516grd01.nc']
+file_names = ['20200514grd01.nc','20200515grd01.nc','20200516grd01.nc']#]#'20200515grd03.nc',
 layers = ['SUM',[0,1,4,5],0] # Use integer/'SUM'/list_of_integers
 starting_time = 0
 max_time = 23
@@ -122,7 +142,7 @@ palette = 'test'
 alt_palette = 'precip4_11lev'
 levels = [20,40,80,160,320,640,1280,2560]
 animate = True
-resolution = "HighRes" # "MediumRes" Don't use HighRes for Domain 1, no difference, more compute time
+resolution = "MediumRes" # "MediumRes" Don't use HighRes for Domain 1, no difference, more compute time
 # SCRIPT SETTINGS ###########################################
 
 # For each file (day) repeat
@@ -139,18 +159,19 @@ for file_name in file_names:
     #Assign variables
     lat  = cdf_file.variables["latitude"]  # Latitude
     lon  = cdf_file.variables["longitude"]  # Longitude
-    # Z    = cdf_file.variables["z"]    # Geopotential height
+    Z    = cdf_file.variables["z"]    # Geopotential height
     z_dim = cdf_file.dimensions['LAY']
     fcrs = cdf_file.variables["FCRS"] # Fine dust particles
     ccrs = cdf_file.variables["CCRS"] # Coarse dust particles
     #time = cdf_file.variables["time"]
     X = cdf_file.variables["X"] 
     Y = cdf_file.variables["Y"]
-    particles = {   'comb':[fcrs,ccrs],
-                    'fcrs':fcrs,
-                    'ccrs':ccrs
+    particles = {   'fcrs':fcrs,
+                    'ccrs':ccrs,
+                    'comb':[fcrs,ccrs],
                     }
     keys = particles.keys()
+    #print(Z[:,3,:,:])
     # Recursively make plots for choosen variables/layers/time
     for key in keys:
         print(f"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Now doing variable: {key}")
@@ -161,7 +182,7 @@ for file_name in file_names:
                 print(f'Now doing time {time}h - layer {layer} - particle {key} and filename {file_name}')
                 name = f"{time}h - layer {layer} - particle {key} - day {file_name[6]}{file_name[7]}"
                 plotTitle = f"Layer: {layer} / Time: {time}h / {key}"
-                plotter(particles[key], 'png', name, time, layer, plotTitle,palette,alt_palette, levels, path, resolution)
+                plotter(particles[key], 'png', name, time, layer, plotTitle,palette,alt_palette, levels, path, resolution, Z)
                 time +=1
             if animate:
                 animator(path,layer)
