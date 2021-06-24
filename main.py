@@ -86,7 +86,8 @@ def collager(path, layer, total, step):
                     t = k
                     print(f"Saved collage (short version)")
                 k += 1   
-def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, palette, alt_palette, levels, path, resolution, Z):
+
+def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, palette, alt_palette, levels, path, resolution, Z, alt_levels):
     global maxVariable, step
     #pyNgl setup
     wkres = Ngl.Resources()
@@ -108,8 +109,6 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, pale
     resources.pmTickMarkDisplayMode = 'Always' 
     #Smoothing
     resources.cnRasterSmoothingOn = True
-    # resources.cnSmoothingOn = True
-    # resources.cnSmoothingDistanceF = 1
     #Projection settings
     resources.mpProjection = "LambertConformal"
     resources.mpLambertParallel1F = cdf_file.attributes['P_ALP'] #45
@@ -140,17 +139,13 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, pale
     
     if layer == 'SUM':
         print(f"Generating sum of all available layers...")
-        i = 1 
+        i = 1
         resources.cnFillPalette = alt_palette
-        targetVariable_ = targetVariable[time,0,:,:]*Z[time,0,:,:]
-        while i < z_dim:
+        targetVariable_ = targetVariable[time,0,:,:]*Z[time,0,:,:]*0.001
+        while i < z_dim:  
             targetVariable_ += targetVariable[time,i,:,:]*(Z[time,i,:,:] - Z[time,i-1,:,:])*0.001
-            _maxVariable = int(math.ceil(numpy.amax(targetVariable_[:,:]) / 100.0)) * 100
-            if _maxVariable > maxVariable and time == 0:
-                maxVariable = _maxVariable
-                step = int(maxVariable/(7*100))*100
             i += 1
-            levels = list(range(1000,int(maxVariable),step))#maybe comment this out if layers appear off 
+        levels = alt_levels
     # If layer is a simple integer
     elif type(layer) is int:
         targetVariable_ = targetVariable[time,layer,:,:]
@@ -166,16 +161,11 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, pale
         print(f"Generating sum of selected layers...")
         i = 1
         resources.cnFillPalette = alt_palette
-        targetVariable_ = targetVariable[time,layer[0],:,:]*Z[time,layer[0],:,:]
+        targetVariable_ = targetVariable[time,layer[0],:,:]*0.001*Z[time,layer[0],:,:]*0.001
         while i < len(layer):
             targetVariable_ += targetVariable[time,layer[i],:,:]*(Z[time,layer[i],:,:] - Z[time,layer[i-1],:,:])*0.001
             i += 1
-            _maxVariable = int(math.ceil(numpy.amax(targetVariable_[:,:]) / 100.0)) * 100
-            if time == 0:
-                maxVariable = 0
-            if _maxVariable > maxVariable and time == 0:
-                maxVariable = _maxVariable
-        levels = list(range(1000,int(maxVariable),int(maxVariable/(7*100))*100))#maybe comment this out if layers appear off 
+        levels = alt_levels
     resources.cnLevels = levels
     Ngl.contour_map(wks,targetVariable_,resources)
     cropper(f'{full_path}.{outputType}')
@@ -183,12 +173,13 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, pale
 
 # SCRIPT SETTINGS ###########################################
 file_names = ['20200514grd01.nc','20200515grd01.nc','20200516grd01.nc']#]#'20200515grd03.nc',
-layers = ['Daily',0,'SUM',[0,1,2,3,4,5,6,7,8,9,10,11,12,13],[14,15,16,17]] # Use integer/'SUM'/list_of_integers
+layers = ['SUM',[0,1,2,3,4,5,6,7,8,9,10,11,12,13],[14,15,16,17],'Daily',0] # Use integer/'SUM'/list_of_integers
 starting_time = 0
 max_time = 23
 palette = 'test'
 alt_palette = 'MPL_YlOrBr'
 levels = [20,40,80,160,320,640,1280,2560]
+alt_levels = [850,1700,2500,3300,4200,5100]
 animate = True
 collage = True
 collage_short = True
@@ -217,9 +208,9 @@ for file_name in file_names:
     #time = cdf_file.variables["time"]
     X = cdf_file.variables["X"] 
     Y = cdf_file.variables["Y"]
-    particles = {   'fcrs':fcrs,
+    particles = {   'comb':[fcrs,ccrs],
+                    'fcrs':fcrs,
                     'ccrs':ccrs,
-                    'comb':[fcrs,ccrs],
                     }
     keys = particles.keys()
     # Recursively make plots for choosen variables/layers/time
@@ -253,10 +244,12 @@ for file_name in file_names:
                     layer_name = 'Surface Level'
                     plotTitle = f"{layer_name} - {date} ~C~{key_name} (~F33~m~F~g/m~S~3~N~)"
                 elif layer == 'Daily':
-                    plotTitle = f"{time_name}h {date} {key_name} Daily Load (mg/m~S~3~N~)"
+                    name = f"Surface Daily ~ particle {key} ~ day {file_name[6]}{file_name[7]}"
+                    path += '/daily/'
+                    plotTitle = f"Surface {date} ~C~{key_name} Daily Load (~F33~m~F~g/m~S~3~N~)"
                 else:
                     plotTitle = f"Layers: {layer_name} - {time_name}h {date} ~C~{key_name} Partial Load (mg/m~S~2~N~)"
-                plotter(particles[key], 'png', name, time, layer, plotTitle,palette,alt_palette, levels, path, resolution, Z)
+                plotter(particles[key], 'png', name, time, layer, plotTitle,palette,alt_palette, levels, path, resolution, Z, alt_levels)
                 time +=1
             if animate and not layer == 'Daily':
                 animator(path,layer)
