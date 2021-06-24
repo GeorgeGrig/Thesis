@@ -179,7 +179,9 @@ max_time = 23
 palette = 'test'
 alt_palette = 'MPL_YlOrBr'
 levels = [20,40,80,160,320,640,1280,2560]
-alt_levels = [850,1700,2500,3300,4200,5100]
+alt_levels_comb = [850,1700,2500,3300,4200,5100]
+alt_levels_fine = [20,180,340,500,700,850,1100]
+alt_levels_coarse = [10,300,600,900,1200,1500,1800,2200]
 animate = True
 collage = True
 collage_short = True
@@ -208,9 +210,9 @@ for file_name in file_names:
     #time = cdf_file.variables["time"]
     X = cdf_file.variables["X"] 
     Y = cdf_file.variables["Y"]
-    particles = {   'comb':[fcrs,ccrs],
-                    'fcrs':fcrs,
+    particles = {   'fcrs':fcrs,
                     'ccrs':ccrs,
+                    'comb':[fcrs,ccrs]
                     }
     keys = particles.keys()
     # Recursively make plots for choosen variables/layers/time
@@ -234,10 +236,13 @@ for file_name in file_names:
                     time_name = time
                 if key == 'fcrs':
                     key_name = 'Fine Dust'
+                    alt_levels = alt_levels_fine
                 if key == 'ccrs':
                     key_name = 'Coarse Dust'
+                    alt_levels = alt_levels_coarse
                 if key == 'comb':
                     key_name = 'Dust'
+                    alt_levels = alt_levels_comb
                 if layer == 'SUM':
                     plotTitle = f"{time_name}h {date} - {key_name} Load (mg/m~S~2~N~)"
                 elif layer == 0:
