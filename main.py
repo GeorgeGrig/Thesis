@@ -173,15 +173,15 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, pale
 
 # SCRIPT SETTINGS ###########################################
 file_names = ['20200514grd01.nc','20200515grd01.nc','20200516grd01.nc']#]#'20200515grd03.nc',
-layers = ['SUM',[0,1,2,3,4,5,6,7,8,9,10,11,12,13],[14,15,16,17],'Daily',0] # Use integer/'SUM'/list_of_integers
+layers = [0,'SUM',[0,1,2,3,4,5,6,7,8,9,10,11,12,13],[14,15,16,17],'Daily'] # Use integer/'SUM'/list_of_integers
 starting_time = 0
 max_time = 23
 palette = 'test'
-alt_palette = 'MPL_YlOrBr'
+alt_palette = 'testcomb'
 levels = [20,40,80,160,320,640,1280,2560]
 alt_levels_comb = [850,1700,2500,3300,4200,5100]
-alt_levels_fine = [20,180,340,500,700,850,1100]
-alt_levels_coarse = [10,300,600,900,1200,1500,1800,2200]
+alt_levels_fine = [10,300,600,900,1200,1500,1800,2200]#[10,180,340,500,700,850,1100]
+alt_levels_coarse = [10,300,600,900,1200,1500,1800,2200]#[10,300,600,900,1200,1500,1800,2200]
 animate = True
 collage = True
 collage_short = True
@@ -210,10 +210,7 @@ for file_name in file_names:
     #time = cdf_file.variables["time"]
     X = cdf_file.variables["X"] 
     Y = cdf_file.variables["Y"]
-    particles = {   'fcrs':fcrs,
-                    'ccrs':ccrs,
-                    'comb':[fcrs,ccrs]
-                    }
+    particles = {'ccrs':ccrs,'fcrs':fcrs,'comb':[fcrs,ccrs]}
     keys = particles.keys()
     # Recursively make plots for choosen variables/layers/time
     date = f'{file_name[6]}{file_name[7]} May {file_name[0]}{file_name[1]}{file_name[2]}{file_name[3]}'
@@ -247,7 +244,7 @@ for file_name in file_names:
                     plotTitle = f"{time_name}h {date} - {key_name} Load (mg/m~S~2~N~)"
                 elif layer == 0:
                     layer_name = 'Surface Level'
-                    plotTitle = f"{layer_name} - {date} ~C~{key_name} (~F33~m~F~g/m~S~3~N~)"
+                    plotTitle = f"{layer_name} - {time_name}h {date} ~C~{key_name} (~F33~m~F~g/m~S~3~N~)"
                 elif layer == 'Daily':
                     name = f"Surface Daily ~ particle {key} ~ day {file_name[6]}{file_name[7]}"
                     path += '/daily/'
