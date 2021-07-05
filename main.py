@@ -5,6 +5,7 @@ import Ngl
 import numpy,sys,os, math, glob, re
 from PIL import Image
 import imageio
+import gc
 maxVariable = 0
 step = 0
 
@@ -127,6 +128,26 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, pale
     resources.tmYROn = False
     resources.tmYLOn = True
     # If combination plot is required
+    if isinstance(targetVariable, tuple):
+        for item in targetVariable:
+            if isinstance(item, list):
+                index = targetVariable.index(item)
+        print('Variable Combination in percentage...')
+        i = 0
+        denominator = targetVariable[index][0][:,:,:,:]
+        while i < len(targetVariable[index]):
+            denominator += targetVariable[index][i][:,:,:,:]
+            i += 1
+        targetVariable = list(targetVariable)
+        del targetVariable[index]
+        norm = numpy.linalg.norm(targetVariable)
+        normal_array = targetVariable/norm
+        targetVariable_ = (targetVariable/denominator)*normal_array*100000
+        targetVariable = numpy.nan_to_num(targetVariable_[0])
+        del targetVariable_
+        del normal_array
+        del denominator
+        levels = alt_levels
     if isinstance(targetVariable, list):
         print('Variable Combination...')
         i = 0
@@ -168,12 +189,15 @@ def plotter(targetVariable, outputType, outputName, time, layer, plotTitle, pale
         levels = alt_levels
     resources.cnLevels = levels
     Ngl.contour_map(wks,targetVariable_,resources)
+    del targetVariable_
+    del targetVariable
     cropper(f'{full_path}.{outputType}')
     Ngl.destroy(wks)
 
 # SCRIPT SETTINGS ###########################################
 file_names = ['20200514grd01.nc','20200515grd01.nc','20200516grd01.nc']#]#'20200515grd03.nc',
-layers = [0,'SUM',[0,1,2,3,4,5,6,7,8,9,10,11,12,13],[14,15,16,17],'Daily'] # Use integer/'SUM'/list_of_integers
+layers = ['SUM',[0,1,2,3,4,5,6,7,8,9,10,11,12,13],[14,15,16,17],'Daily',0] # Use integer/'SUM'/list_of_integers
+layer = ['SUM']
 starting_time = 0
 max_time = 23
 palette = 'test'
@@ -182,6 +206,7 @@ levels = [20,40,80,160,320,640,1280,2560]
 alt_levels_comb = [850,1700,2500,3300,4200,5100]
 alt_levels_fine = [10,300,600,900,1200,1500,1800,2200]#[10,180,340,500,700,850,1100]
 alt_levels_coarse = [10,300,600,900,1200,1500,1800,2200]#[10,300,600,900,1200,1500,1800,2200]
+alt_levels_percentage = [12,25,38,50,65,80,95,100]
 animate = True
 collage = True
 collage_short = True
@@ -210,7 +235,9 @@ for file_name in file_names:
     #time = cdf_file.variables["time"]
     X = cdf_file.variables["X"] 
     Y = cdf_file.variables["Y"]
-    particles = {'ccrs':ccrs,'fcrs':fcrs,'comb':[fcrs,ccrs]}
+    comb = [fcrs,ccrs]
+    particles = {'CoarsePercent': (comb,ccrs),'FinePercent': (comb,fcrs),'ccrs':ccrs,'fcrs':fcrs,'comb':comb}
+    particles = {'CoarsePercent': (comb,ccrs),'FinePercent': (comb,fcrs)}
     keys = particles.keys()
     # Recursively make plots for choosen variables/layers/time
     date = f'{file_name[6]}{file_name[7]} May {file_name[0]}{file_name[1]}{file_name[2]}{file_name[3]}'
@@ -240,6 +267,12 @@ for file_name in file_names:
                 if key == 'comb':
                     key_name = 'Dust'
                     alt_levels = alt_levels_comb
+                if key == 'CoarsePercent':
+                    key_name = 'Coarse Dust Percentage'
+                    alt_levels = alt_levels_percentage
+                if key == 'FinePercent':
+                    key_name = 'Fine Dust Percentage'
+                    alt_levels = alt_levels_percentage
                 if layer == 'SUM':
                     plotTitle = f"{time_name}h {date} - {key_name} Load (mg/m~S~2~N~)"
                 elif layer == 0:
